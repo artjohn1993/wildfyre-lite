@@ -1,0 +1,2 @@
+com/generator/wildfyrelite/BuildConfig.java
+ com.generator.wildfyrelite.BuildConfig
