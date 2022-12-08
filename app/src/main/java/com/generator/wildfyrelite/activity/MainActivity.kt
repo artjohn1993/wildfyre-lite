@@ -13,14 +13,19 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.generator.wildfyrelite.R
+import com.generator.wildfyrelite.api.GoogleSheetApi
 import com.generator.wildfyrelite.defaultSettings
 import com.generator.wildfyrelite.dialog.CloseDialog
 import com.generator.wildfyrelite.dialog.UrlCheckerDialog
 import com.generator.wildfyrelite.enum.WebOpenerDB
 import com.generator.wildfyrelite.events.IdleCheckerEvent
 import com.generator.wildfyrelite.local_db.DatabaseHandler
+import com.generator.wildfyrelite.model.GoogleSheet
 import com.generator.wildfyrelite.model.URLData
+import com.generator.wildfyrelite.presenter.GoogleSheetPresenterClass
+import com.generator.wildfyrelite.presenter.GoogleSheetView
 import com.generator.wildfyrelite.services.IdleChecker
+import io.reactivex.disposables.CompositeDisposable
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.custom_action_bar.*
 import org.greenrobot.eventbus.EventBus
@@ -31,11 +36,18 @@ import org.jetbrains.anko.startActivity
 import kotlin.collections.ArrayList
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), GoogleSheetView {
     var db = DatabaseHandler(this)
     var urlData: MutableList<URLData.Details> = ArrayList()
     var total = 0
     var closeDialog = CloseDialog()
+    var googleSheet : GoogleSheet.Result? = null
+
+    private var compositeDisposable: CompositeDisposable = CompositeDisposable()
+    private val apiServer by lazy {
+        GoogleSheetApi.create(this)
+    }
+    val presenter = GoogleSheetPresenterClass(this, apiServer)
 
     @SuppressLint("WrongConstant")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -43,8 +55,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         actionBar?.hide()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        versionTxt.text = "Version 20220709.1"
-        //wildfyre_lite_v.20220709.1
+        versionTxt.text = "Version 20221208.1"
+        //wildfyre_lite_v.20221208.1
 
         bind()
     }
@@ -56,6 +68,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        compositeDisposable.clear()
     }
 
     override fun onResume() {
@@ -73,7 +86,6 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun bind() {
-        checkDataBase()
         setClickEvent()
     }
 
@@ -87,9 +99,7 @@ class MainActivity : AppCompatActivity() {
 
         start.setOnClickListener {
             start.imageResource = R.drawable.pause2
-            saveUrl()
-            saveFactor()
-            startActivity<WordpressLoaderActivity>()
+            checkDataBase()
         }
 
         shuffleBtn.setOnClickListener {
@@ -121,8 +131,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveUrl() {
         db.deleteDatabase(WebOpenerDB.TABLE_URL.getValue())
+        urlData.shuffle()
         urlData.forEach { item ->
-            db.insertURL(item.url!!)
+            db.insertURL(item)
         }
     }
 
@@ -146,32 +157,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkDataBase() {
         checkURL()
-        checkFactor()
-    }
-
-    private fun checkFactor() {
-        var data = db.getFactor()
-        if (data == 0) {
-            factor.setText(defaultSettings?.factor)
-        } else {
-            factor.setText(data.toString())
-        }
     }
 
     private fun checkURL() {
-        var data = db.getURL()
-        if (data.isEmpty()) {
-            defaultSettings!!.url.forEach { item ->
-                addURLEditText(item)
-            }
-        } else {
-            data.forEach { item ->
-                addURLEditText(item)
-            }
-        }
+        presenter.getUrl("https://sheets.googleapis.com/v4/spreadsheets/13vq1wyaG7x9bPYak0OgYHspq14RAb60zvMNled9MyYs/values/wildfyre?dateTimeRenderOption=FORMATTED_STRING&majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE&key=AIzaSyAdETbAw9fqHW5wCv5Hnipoc1kvGmCEfoA")
     }
 
-    private fun addURLEditText(url: String?) {
+    private fun addURLEditText(url: String?,days: String = "", pages:String = "", pauseFrom:String ="", pauseTo:String = "" ) {
         addURL.text = "add URL (${++total})"
         var editText = EditText(this)
         var layout = LinearLayout.LayoutParams(
@@ -183,7 +175,14 @@ class MainActivity : AppCompatActivity() {
         editText.id = View.generateViewId()
         editText.hint = "Enter URL"
         editText.setText(url)
-        var data = URLData.Details(url, editText.id.toString())
+        var data = URLData.Details(
+            url,
+            editText.id.toString(),
+            days,
+            pages,
+            pauseFrom,
+            pauseTo
+        )
         urlData.add(data)
         editText.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
@@ -204,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         urlData.forEach { data ->
             index++
             if (id == data.id) {
-                var newData = URLData.Details(url, id)
+                var newData = URLData.Details(url, id,"","","","")
                 urlData[index] = newData
             }
         }
@@ -214,15 +213,27 @@ class MainActivity : AppCompatActivity() {
         closeDialog.showDialog(this)
     }
 
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    fun onIdleCheckerEvent(event: IdleCheckerEvent) {
-        println("IdleCheckerEvent")
-        shuffleUrl()
+    override fun responseGetUrl(data: GoogleSheet.Result) {
+        data.values.removeAt(0)
 
-        start.imageResource = R.drawable.pause2
+        googleSheet = data
+        data.values.forEach { item ->
+            addURLEditText(item[0],item[1],item[2],item[3], item[4] )
+        }
         saveUrl()
         saveFactor()
+        stopService(Intent(this,IdleChecker::class.java))
         startActivity<WordpressLoaderActivity>()
+    }
+
+    override fun responseGetUrlFailed(data: String) {
+
+    }
+
+
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    fun onIdleCheckerEvent(event: IdleCheckerEvent) {
+        checkDataBase()
     }
 
 }
