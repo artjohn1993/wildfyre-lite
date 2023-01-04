@@ -112,8 +112,8 @@ class DatabaseHandler(val context : Context) : SQLiteOpenHelper(context, WebOpen
                 var pauseFrom = urlData.pauseFrom.split(":").toTypedArray()
                 var pauseTo = urlData.pauseTo.split(":").toTypedArray()
 
-                if (pauseFrom[0].toInt() > currentHour || pauseTo[0].toInt() < currentHour) {
-                    if (pauseFrom[1].toInt() > currentMinute || pauseTo[1].toInt() < currentMinute) {
+                if (pauseFrom[0].toInt() >= currentHour || pauseTo[0].toInt() <= currentHour) {
+                    if (pauseFrom[1].toInt() >= currentMinute || pauseTo[1].toInt() <= currentMinute) {
                         list.add(urlData)
                     }
                 }
