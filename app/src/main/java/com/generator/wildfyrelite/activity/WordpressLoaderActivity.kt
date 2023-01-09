@@ -1,6 +1,7 @@
 package com.generator.wildfyrelite.activity
 
 import android.annotation.SuppressLint
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.CountDownTimer
@@ -10,6 +11,7 @@ import android.view.View
 import android.view.WindowManager
 import android.webkit.WebStorage
 import android.widget.LinearLayout
+import androidx.annotation.RequiresApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.generator.wildfyrelite.R
 import com.generator.wildfyrelite.adapter.LoaderAdapter
@@ -72,6 +74,7 @@ class WordpressLoaderActivity : AppCompatActivity(), WordpressView {
         EventBus.getDefault().register(this)
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_wordpress_loader)
@@ -205,24 +208,31 @@ class WordpressLoaderActivity : AppCompatActivity(), WordpressView {
             wordpressLoadUrl.add(0, wordpressResponse[0])
             wordpressResponse.removeAt(0)
             recyclerWordpressLoader.adapter!!.notifyDataSetChanged()
-//            recyclerWordpressLoader.scrollToPosition(wordpressLoadUrl.count() - 1)
-            //wordpressLoadUrl.removeAt(0)
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.N)
     private fun bind() {
         setRecycler()
         urlData = db.getURL()
         if (urlData.isEmpty()) {
             downloadingCon.visibility = View.GONE
-            Snackbar.make(
-                findViewById(android.R.id.content),
-                "URL not available at this time",
-                Snackbar.LENGTH_SHORT
-            ).show()
+            pauseMessage()
         } else {
             downloadWordpress()
         }
+    }
+
+    private fun pauseMessage() {
+        Snackbar.make(
+            findViewById(android.R.id.content),
+            "All URL are currently paused.",
+            Snackbar.LENGTH_SHORT
+        ).show()
+
+        Handler().postDelayed({
+            finish()
+        }, 10000)
     }
 
     private fun downloadWordpress() {
@@ -268,7 +278,7 @@ class WordpressLoaderActivity : AppCompatActivity(), WordpressView {
             val timeToMatch = Calendar.getInstance()
             var currentHour = timeToMatch[Calendar.HOUR_OF_DAY]
 
-            if(currentHour == 24 || currentHour == 12) {
+            if(currentHour == 24 || currentHour == 12 || currentHour == 6 || currentHour == 18) {
                 finish()
             } else {
                 completionHandler.invoke(db.getURL())

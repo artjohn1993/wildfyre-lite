@@ -55,8 +55,8 @@ class MainActivity : AppCompatActivity(), GoogleSheetView {
         setContentView(R.layout.activity_main)
         actionBar?.hide()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        versionTxt.text = "Version 20230104.1"
-        //wildfyre_lite_v.20230104.1
+        versionTxt.text = "Version 20230109.1"
+        //wildfyre_lite_v.20230109.1
 
         bind()
     }
